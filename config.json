@@ -1,0 +1,4 @@
+{
+    "dataseedpath" : "./data/small.json",
+    "dbPath" : "data/db.db"
+}

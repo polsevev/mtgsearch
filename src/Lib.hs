@@ -4,31 +4,40 @@ module Lib
     ) where
 import Data.Aeson
 import Data.Text
-import Control.Applicative
-import Control.Monad
+
 import qualified Data.ByteString.Lazy as B
-import           Control.Applicative
-import qualified Data.Text as T
+
 import Database.SQLite.Simple
 
 import Config
 
 import GHC.Generics
-import GHC.Read (readField)
+data ImageUris = ImageUris {
+    small :: Text,
+    normal :: Text,
+    large :: Text,
+    png :: Text,
+    art_crop :: Text,
+    border_crop :: Text
+}deriving (Show,Generic)
+instance FromJSON ImageUris
+instance ToJSON ImageUris
 
 data Card = Card{
     object :: Text,
     id :: Text,
     lang :: Text,
     name :: Text,
-    oracle_text :: Maybe Text
+    oracle_text :: Maybe Text,
+    image_uris :: Maybe ImageUris
 } deriving (Show,Generic)
 
 instance FromJSON Card
 instance ToJSON Card
 
 instance ToRow Card where
-  toRow (Card object id lang name oracle_text) = toRow (id, lang, name, oracle_text)
+    toRow (Card object id lang name oracle_text (Just (ImageUris _ image_link _ _ _ _ ))) = toRow (id, lang, name, oracle_text, image_link)
+    toRow (Card object id lang name oracle_text Nothing) = toRow (id, lang, name, oracle_text, pack "Nothing")
 
 
 
@@ -37,7 +46,7 @@ getJSON file = B.readFile file
 
 insertCards :: Connection -> [Card] -> IO()
 insertCards conn ((card):cards) = do
-    execute conn "INSERT INTO card (scryfall_id, lang, name, oracle_text) VALUES (?,?,?,?)" card 
+    execute conn "INSERT INTO card (scryfall_id, lang, name, oracle_text, image_uri) VALUES (?,?,?,?,?)" card 
     insertCards conn cards
     return ()
 insertCards conn [] = return ()
@@ -48,9 +57,9 @@ seedData = do
     
     seedData <- getDataSeedPath
     dbPath <- getDbPath
-    d <- (eitherDecode <$> getJSON  seedData) :: IO (Either String [Card])
+    d <- (eitherDecode <$> getJSON seedData) :: IO (Either String [Card])
     conn <- open dbPath
-    execute_ conn "CREATE TABLE IF NOT EXISTS card (id INTEGER PRIMARY KEY, scryfall_id TEXT, lang TEXT, name TEXT, oracle_text TEXT)"
+    execute_ conn "CREATE TABLE IF NOT EXISTS card (id INTEGER PRIMARY KEY, scryfall_id TEXT, lang TEXT, name TEXT, oracle_text TEXT, image_uri TEXT)"
     
 
     case d of

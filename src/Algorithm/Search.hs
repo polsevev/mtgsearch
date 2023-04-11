@@ -9,13 +9,14 @@ import Control.Monad
 import qualified Data.Text as T
 
 
-data TestField = TestField Int T.Text deriving (Show)
+data Card = Card Int T.Text T.Text deriving (Show)
 
-instance FromRow TestField where
-  fromRow = TestField <$> field <*> field
+instance FromRow Card where
+  fromRow = Card <$> field <*> field <*> field
 
-instance ToRow TestField where
-  toRow (TestField id_ str) = toRow (id_, str)
+instance ToRow Card where
+
+  toRow (Card id_ str image_uri) = toRow (id_, str, image_uri)
 
 search :: String -> IO String
 search q = do
@@ -25,5 +26,12 @@ simpleSearch :: String -> IO String
 simpleSearch q = do
     dbPath <- getDbPath
     conn <- open dbPath
-    res <-  queryNamed conn "select id, name from card where name like :name" [":name" := ("%"++q++"%")] :: IO [TestField]
-    return (show res)
+    res <-  queryNamed conn "select id, name, image_uri from card where name like :name" [":name" := ("%"++q++"%")] :: IO [Card]
+    let hyperText = buildHtml res
+    return hyperText
+
+buildHtml :: [Card] -> String
+buildHtml = concatMap cardToHtml
+
+cardToHtml :: Card -> String
+cardToHtml (Card id name image_uri) = "<h2>" ++ show name ++ "</h2>" ++ "<img src=" ++ show image_uri ++ "/>"

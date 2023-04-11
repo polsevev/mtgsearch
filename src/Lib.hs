@@ -52,10 +52,7 @@ seedData = do
     conn <- open dbPath
     execute_ conn "CREATE TABLE IF NOT EXISTS card (id INTEGER PRIMARY KEY, scryfall_id TEXT, lang TEXT, name TEXT, oracle_text TEXT)"
     
-    -- If d is Left, the JSON was malformed.
-    -- In that case, we report the error.
-    -- Otherwise, we perform the operation of
-    -- our choice. In this case, just print it.
+
     case d of
         Left err -> putStrLn err
         Right ps -> insertCards conn ps

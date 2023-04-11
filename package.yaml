@@ -25,7 +25,8 @@ dependencies:
 - text
 - bytestring
 - sqlite-simple
-
+- scotty
+- directory
 
 ghc-options:
 - -Wall

@@ -20,7 +20,8 @@ instance ToRow Card where
 
 search :: String -> IO String
 search q = do
-    simpleSearch q
+  let tokens = lexx q
+  simpleSearch q
 
 simpleSearch :: String -> IO String
 simpleSearch q = do
@@ -34,4 +35,4 @@ buildHtml :: [Card] -> String
 buildHtml = concatMap cardToHtml
 
 cardToHtml :: Card -> String
-cardToHtml (Card id name image_uri) = "<h2>" ++ show name ++ "</h2>" ++ "<img src=" ++ show image_uri ++ "/>"
+cardToHtml (Card id name image_uri) = "<div class=\"card\"><h2>" ++ show name ++ "</h2>" ++ "<img src=" ++ show image_uri ++ "/> </div>"

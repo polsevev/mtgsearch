@@ -25,6 +25,8 @@ source-repository head
 
 library
   exposed-modules:
+      Algorithm.BottomQuery
+      Algorithm.Lex
       Algorithm.Search
       Config
       Lib

@@ -7,6 +7,11 @@ import Data.Text
 
 import qualified Data.ByteString.Lazy as B
 import GHC.Generics
+import Control.Exception (try)
+import Data.ByteString.Builder (lazyByteString)
+import qualified Data.Aeson.Key as B
+import qualified Data.Data as B
+import GHC.IO.Exception
 
 
 
@@ -18,9 +23,18 @@ data Config = Config{
 instance FromJSON Config
 instance ToJSON Config
 
-configFile = "./config.json"
+
+
+configFile = "./Config/config.json"
+
+
 getJSON :: IO B.ByteString
-getJSON = B.readFile configFile
+getJSON = do
+    a <- try $ B.readFile configFile :: IO (Either IOException B.ByteString )
+    case a of
+        Right a -> return a
+        Left b -> error $ "Could not load configuration file"
+
 
 
 readConfig :: IO (Maybe Config)
@@ -33,6 +47,7 @@ readConfig = do
             putStrLn err
             return Nothing
 
+getConfig :: IO Config
 getConfig = extract readConfig
 
 getDataSeedPath ::IO (String)

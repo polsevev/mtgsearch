@@ -18,5 +18,5 @@ This will not work:
 ```
 However this will
 ```
-((IS Instant) union (Color Red) union (Color Green))
+((IS Instant) union (Color Red)) union (Color Green)
 ```

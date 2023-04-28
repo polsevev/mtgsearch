@@ -9,19 +9,28 @@ import Data.ByteString (count, putStr)
 lexx :: String -> Token
 lexx qur = do
 
-    let collected = collector qur
-    let parenthesisFixed = fixSeparators collected
-    let parenthesis = matchParenthesis parenthesisFixed 0
+    let collected = clearRepeatedSpaces $ collector qur
+    let parenthesises = trace (show $ matchParenthesis collected 0) (matchParenthesis collected 0)
+    let (parenthesisFixed, parenthesis) = trace (show $ fixSeparators collected parenthesises) fixSeparators collected parenthesises
     seperator parenthesisFixed parenthesis
 
 
-fixSeparators :: [String] -> [String]
-fixSeparators ("(":values) = "(":values
-fixSeparators values = ["("] ++ values++ [")"]
+fixSeparators :: [String] -> [(Int, Int)] -> ([String], [(Int, Int)])
+fixSeparators values parenthesis@((start,end):rest) | start == 0 && end == ( length values -1) = (values, parenthesis)
+fixSeparators values parenthesis  = ( ["("] ++ values ++ [")"], (0, length values + 1):map addOne parenthesis)
 
+addOne (x,y) = (x+1, y+1)
 
 isLegal :: Char -> Bool
 isLegal x = x `notElem` ['(',')',' ']
+
+
+clearRepeatedSpaces :: [String] -> [String]
+clearRepeatedSpaces (a:as) = case a of
+    " " -> " ": clearRepeatedSpaces (dropWhile (==" ") as)
+    b -> b: clearRepeatedSpaces as
+clearRepeatedSpaces [] = []
+
 
 collector :: String -> [String]
 collector [] = []
@@ -45,7 +54,7 @@ findClosing (x:xs) stackCount count = findClosing xs stackCount (count+1)
 findClosing [] _ _ = error "Unequal number of parenthesis"
 
 
-data Token = Seperated String Token Token | Queri String deriving Show
+data Token = Seperated String Token Token | Queri String String deriving Show
 
 seperator :: [String] -> [(Int, Int)] -> Token
 seperator ("(":rest) ((start,end):points) = case drop (end-start) rest of
@@ -55,8 +64,8 @@ seperator ("(":rest) ((start,end):points) = case drop (end-start) rest of
 
 
 
-seperator [name, " ", value, ")"] points = Queri (name++" "++value)
-seperator a _ = Queri "LOL" --error "Something went wrong tokenizing the input!"
+seperator [name, " ", value, ")"] points = Queri name value
+seperator a _ = error "Something went wrong tokenizing the input!"
 
 
 

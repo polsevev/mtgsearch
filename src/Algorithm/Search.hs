@@ -7,6 +7,7 @@ import Config (getDbPath)
 import Web.Scotty.Internal.Types
 import Control.Monad
 import qualified Data.Text as T
+import Algorithm.Lex
 
 
 data Card = Card Int T.Text T.Text deriving (Show)

@@ -15,7 +15,7 @@ host = scotty 3000 $ do
   post "/api/req" $ do
 
             query <-  param "query"
-            liftIO (putStrLn $ "\nOutput!" ++ show (lexx query))
+            liftIO (putStrLn $ "\nOutput! " ++ show (lexx query))
             cards <- liftIO (search query)
             result <- liftIO (search query)
             html $ mconcat ["<h1>", pack result, "</h1>"]

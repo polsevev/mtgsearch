@@ -1,5 +1,4 @@
 {-# LANGUAGE DeriveGeneric, OverloadedStrings #-}
-{-# OPTIONS_GHC -Wno-unused-do-bind #-}
 module Site.Host
     ( host
     ) where
@@ -15,8 +14,8 @@ host = scotty 3000 $ do
   post "/api/req" $ do
 
             query <-  param "query"
-            liftIO (putStrLn $ "\nOutput! " ++ show (lexx query))
-            cards <- liftIO (search query)
+            --liftIO (putStrLn $ "\nOutput! " ++ show (lexx query))
+            --cards <- liftIO (search query)
             result <- liftIO (search query)
             html $ mconcat ["<h1>", pack result, "</h1>"]
 

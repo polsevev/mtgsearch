@@ -1,7 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Algorithm.Lex
     ( lexx
-    , Token(..)) where
+    , Token(..)
+    , QueryDef(..)
+    , Operator(..)) where
 import Prelude hiding (lex)
 import Debug.Trace
 import Data.ByteString (count, putStr)
@@ -18,6 +20,8 @@ lexx qur = do
 fixSeparators :: [String] -> [(Int, Int)] -> ([String], [(Int, Int)])
 fixSeparators values parenthesis@((start,end):rest) | start == 0 && end == ( length values -1) = (values, parenthesis)
 fixSeparators values parenthesis  = ( ["("] ++ values ++ [")"], (0, length values + 1):map addOne parenthesis)
+
+
 
 addOne (x,y) = (x+1, y+1)
 
@@ -54,31 +58,23 @@ findClosing (x:xs) stackCount count = findClosing xs stackCount (count+1)
 findClosing [] _ _ = error "Unequal number of parenthesis"
 
 
-data Token = Seperated String Token Token | Queri String String deriving Show
+data Token = Func Operator Token Token | Queri QueryDef deriving Show
+data QueryDef = SuperType String| Color String deriving Show
+data Operator = Union deriving Show
 
 seperator :: [String] -> [(Int, Int)] -> Token
 seperator ("(":rest) ((start,end):points) = case drop (end-start) rest of
-            " ":operator:" ":"(":rightRest -> Seperated operator (seperator (take (end-start) rest) points)   (seperator (init rightRest) points)
+            " ":operator:" ":"(":rightRest -> Func (extractOperator operator) (seperator (take (end-start) rest) points)   (seperator (init rightRest) points)
             [] -> seperator (take (end-start) rest) points
             _ ->error "Operator need something to the right and left of it!"
+seperator [name, " ", value, ")"] _ = Queri (extractQueryDef (name, value))
+seperator a _ = error $ "Something went wrong tokenizing the input!\n" ++ (show a) 
 
+extractQueryDef :: (String, String) -> QueryDef
+extractQueryDef ("SuperType", value) = SuperType value
+extractQueryDef _ = error $ "This command was not valid"
 
-
-seperator [name, " ", value, ")"] points = Queri name value
-seperator a _ = error "Something went wrong tokenizing the input!"
-
-
-
---This one works, but not for lines!
-
--- seperator :: [String] -> [(Int, Int)] -> Seperated
--- seperator ("(":rest) ((start,end):points) = case drop (end-start) rest of
---             " ":operator:" ":"(":rightRest -> Seperated operator (seperator (take (end-start) rest) points)   (seperator (init rightRest) points)
---             [] -> seperator (take (end-start) rest) points 
---             a ->trace (show a) error "This is not allowed"
-
-
-
-
+extractOperator "union" = Union
+extractOperator _ = error $ "This operator is not defined"
 -- ((Is instant) union (Color R)) union ((Is instant) union (Color R))
 -- (((Color Red) union (Color Blue)) union ((Is instant) union (Is Enchantment)))

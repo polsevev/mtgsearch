@@ -25,10 +25,13 @@ source-repository head
 
 library
   exposed-modules:
+      Algorithm.BaseQuery
       Algorithm.Lex
+      Algorithm.Operator
       Algorithm.Search
       Config
       Lib
+      Seed
       Site.Host
   other-modules:
       Paths_mtgsearch

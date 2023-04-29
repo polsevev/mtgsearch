@@ -3,37 +3,49 @@ module Algorithm.Search
     ( search
     ) where
 import Database.SQLite.Simple
+import Algorithm.BaseQuery
 import Config (getDbPath)
-import Web.Scotty.Internal.Types
-import Control.Monad
 import qualified Data.Text as T
 import Algorithm.Lex
+import Control.Monad
+import Data.Text (unpack)
+import Algorithm.Operator (union)
+import Control.Monad.IO.Class
 
 
-data Card = Card Int T.Text T.Text deriving (Show)
-
-instance FromRow Card where
-  fromRow = Card <$> field <*> field <*> field
-
-instance ToRow Card where
-
-  toRow (Card id_ str image_uri) = toRow (id_, str, image_uri)
 
 search :: String -> IO String
 search q = do
   let tokens = lexx q
-  simpleSearch q
+  queryRes <- executeQuery tokens
+  let hyperText = buildHtml queryRes
+  return hyperText
 
-simpleSearch :: String -> IO String
-simpleSearch q = do
-    dbPath <- getDbPath
-    conn <- open dbPath
-    res <-  queryNamed conn "select id, name, image_uri from card where name like :name" [":name" := ("%"++q++"%")] :: IO [Card]
-    let hyperText = buildHtml res
-    return hyperText
+
+
+executeQuery :: Token -> IO [Card]
+executeQuery (Queri bottom) = executeBottomQuery bottom
+executeQuery (Func Union leftToken rightToken) = executeQuery leftToken `union` executeQuery rightToken
+executeQuery _ = error $ "Not implemented!"
+
 
 buildHtml :: [Card] -> String
 buildHtml = concatMap cardToHtml
 
+
+
+executeBottomQuery :: QueryDef -> IO [Card]
+executeBottomQuery (SuperType value) = superType value
+executeBottomQuery _ = error $ "Not implemented yet"
+
+
+
+
 cardToHtml :: Card -> String
-cardToHtml (Card id name image_uri) = "<div class=\"card\"><h2>" ++ show name ++ "</h2>" ++ "<img src=" ++ show image_uri ++ "/> </div>"
+cardToHtml (Card id_ scryfall_id lang name (Just oracle_text) (Just image_uri) type_line) =
+  "<div class=\"card\" style=\"text-align:center\"><h2>" ++ unpack name ++ "</h2>" ++
+  "<img src=" ++ unpack image_uri ++ " width=\"200px\"/>"++
+  "<p>" ++ unpack oracle_text ++ "<p>"++" </div>"
+
+
+cardToHtml _ = "<h1>Could not load that card</h1>"

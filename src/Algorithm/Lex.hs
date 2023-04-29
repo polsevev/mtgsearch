@@ -60,7 +60,7 @@ findClosing [] _ _ = error "Unequal number of parenthesis"
 
 data Token = Func Operator Token Token | Queri QueryDef deriving Show
 data QueryDef = SuperType String| Color String deriving Show
-data Operator = Union deriving Show
+data Operator = Union | Intersect deriving Show
 
 seperator :: [String] -> [(Int, Int)] -> Token
 seperator ("(":rest) ((start,end):points) = case drop (end-start) rest of
@@ -75,6 +75,7 @@ extractQueryDef ("SuperType", value) = SuperType value
 extractQueryDef _ = error $ "This command was not valid"
 
 extractOperator "union" = Union
+extractOperator "intersect" = Intersect
 extractOperator _ = error $ "This operator is not defined"
 -- ((Is instant) union (Color R)) union ((Is instant) union (Color R))
 -- (((Color Red) union (Color Blue)) union ((Is instant) union (Is Enchantment)))

@@ -9,23 +9,26 @@ import qualified Data.Text as T
 import Algorithm.Lex
 import Control.Monad
 import Data.Text (unpack)
-import Algorithm.Operator (union)
+import Algorithm.Operator (union, intersect)
 import Control.Monad.IO.Class
 
-
+data Tree = Funct Operator Tree Tree | Holder [Card]
 
 search :: String -> IO String
 search q = do
   let tokens = lexx q
-  queryRes <- executeQuery tokens
+  tree <- liftIO (executeBottomQuery tokens)
+
+  let queryRes = executeQuery tree
   let hyperText = buildHtml queryRes
   return hyperText
 
 
 
-executeQuery :: Token -> IO [Card]
-executeQuery (Queri bottom) = executeBottomQuery bottom
-executeQuery (Func Union leftToken rightToken) = executeQuery leftToken `union` executeQuery rightToken
+executeQuery :: Tree -> [Card]
+executeQuery (Holder cards) = cards
+executeQuery (Funct Union leftToken rightToken) = executeQuery leftToken `union` executeQuery rightToken
+executeQuery (Funct Intersect leftToken rightToken) = executeQuery leftToken `intersect` executeQuery rightToken
 executeQuery _ = error $ "Not implemented!"
 
 
@@ -33,10 +36,17 @@ buildHtml :: [Card] -> String
 buildHtml = concatMap cardToHtml
 
 
+--Fancy trickery to move the IO to outer, in order to allow all the combinatorics to not have to live in IO land :)
+executeBottomQuery :: Token -> IO Tree
+executeBottomQuery (Queri (SuperType value)) =  do 
+  temp <- superType value
+  return $ Holder temp
+executeBottomQuery (Queri _) = error $ "Not implemented yet"
+executeBottomQuery (Func operator left right) = do 
+  left <- executeBottomQuery left
+  right <- executeBottomQuery right
+  return $ Funct operator left right
 
-executeBottomQuery :: QueryDef -> IO [Card]
-executeBottomQuery (SuperType value) = superType value
-executeBottomQuery _ = error $ "Not implemented yet"
 
 
 

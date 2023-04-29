@@ -18,6 +18,9 @@ data Card = Card
   T.Text
   deriving (Show)
 
+instance Eq Card where
+  (==) (Card id_ _ _ _ _ _ _) (Card id2_ _ _ _ _ _ _) = id_ == id2_
+
 instance FromRow Card where
   fromRow = Card <$> field <*> field <*> field <*> field <*> field <*> field <*> field
 

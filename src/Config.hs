@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveGeneric, OverloadedStrings #-}
 module Config
-    ( getDataSeedPath, getDbPath
+    ( getDataSeedPath, getDbPath, getBulkDataLink
     ) where
 import Data.Aeson
 import Data.Text
@@ -17,7 +17,8 @@ import GHC.IO.Exception
 
 data Config = Config{
     dataseedpath :: String,
-    dbPath :: String
+    dbPath :: String,
+    bulkDataLink :: String
 } deriving (Show,Generic)
 
 instance FromJSON Config
@@ -57,6 +58,10 @@ getDataSeedPath = do
 getDbPath ::IO (String)
 getDbPath = do
     dbPath <$> getConfig
+
+getBulkDataLink :: IO (String)
+getBulkDataLink = do
+    bulkDataLink <$> getConfig
 
 extract :: IO (Maybe a) -> IO a
 extract = (>>= maybe (ioError $ userError "Could not read config!") return)

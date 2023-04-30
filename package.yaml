@@ -27,7 +27,8 @@ dependencies:
 - sqlite-simple
 - scotty
 - directory
-
+- http-client
+- http-client-tls
 ghc-options:
 - -Wall
 - -Wcompat

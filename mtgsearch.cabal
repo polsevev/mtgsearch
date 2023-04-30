@@ -30,6 +30,7 @@ library
       Algorithm.Operator
       Algorithm.Search
       Config
+      DataFetcher
       Lib
       Seed
       Site.Host
@@ -43,6 +44,8 @@ library
     , base >=4.7 && <5
     , bytestring
     , directory
+    , http-client
+    , http-client-tls
     , scotty
     , sqlite-simple
     , text
@@ -60,6 +63,8 @@ executable mtgsearch-exe
     , base >=4.7 && <5
     , bytestring
     , directory
+    , http-client
+    , http-client-tls
     , mtgsearch
     , scotty
     , sqlite-simple
@@ -79,6 +84,8 @@ test-suite mtgsearch-test
     , base >=4.7 && <5
     , bytestring
     , directory
+    , http-client
+    , http-client-tls
     , mtgsearch
     , scotty
     , sqlite-simple

@@ -1,4 +1,5 @@
 {
     "dataseedpath" : "./data/small.json",
-    "dbPath" : "data/db.db"
+    "dbPath" : "data/db.db",
+    "bulkDataLink" : "https://data.scryfall.io/default-cards/default-cards-20230430090702.json"
 }

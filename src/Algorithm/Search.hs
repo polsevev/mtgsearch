@@ -60,7 +60,7 @@ cardToHtml :: Card -> String
 cardToHtml (Card id_ scryfall_id lang name (Just oracle_text) (Just image_uri) type_line cmc) =
   "<div class=\"card\" style=\"text-align:center\"><h2>" ++ unpack name ++ "</h2>" ++
   "<img src=" ++ unpack image_uri ++ " width=\"200px\"/>"++
-  "<p style=\"width:200px\">" ++ unpack oracle_text ++ "<p>"++" </div>"
+  "<p style=\"width:205px;margin: 0 auto;font-size:12;\">" ++ unpack oracle_text ++ "<p>"++" </div>"
 
 
 cardToHtml _ = "<h1>Could not load that card</h1>"

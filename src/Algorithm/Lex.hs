@@ -3,18 +3,19 @@ module Algorithm.Lex
     ( lexx
     , Token(..)
     , QueryDef(..)
-    , Operator(..)) where
+    , Operator(..)
+    , ParseError(..)) where
 import Prelude hiding (lex)
-import Debug.Trace
-import Data.ByteString (count, putStr)
+import Data.Either
+import Text.Read (readMaybe)
 
-
-lexx :: String -> Token
+lexx :: String -> Either ParseError Token
 lexx qur = do
     let collected = clearRepeatedSpaces $ collector $ strip $ stripFront $ clearIllegalCharacters qur
     let parenthesises = matchParenthesis collected 0
     let (parenthesisFixed, parenthesis) = fixSeparators collected parenthesises
     seperator parenthesisFixed parenthesis
+        
 
 stripFront :: [Char] -> [Char]
 stripFront = dropWhile (==' ')
@@ -29,7 +30,7 @@ strip [] = []
 
 
 fixSeparators :: [String] -> [(Int, Int)] -> ([String], [(Int, Int)])
-fixSeparators values parenthesis@((start,end):rest) | start == 0 && end == ( length values -1) = (values, parenthesis)
+fixSeparators values parenthesis@((start,end):_) | start == 0 && end == ( length values -1) = (values, parenthesis)
 fixSeparators values parenthesis  = ( ["("] ++ values ++ [")"], (0, length values + 1):map addOne parenthesis)
 
 
@@ -73,7 +74,12 @@ findClosing (x:xs) stackCount count = findClosing xs stackCount (count+1)
 findClosing [] _ _ = error "Unequal number of parenthesis"
 
 
-data Token = Func Operator Token Token | Queri QueryDef deriving Show
+newtype ParseError = ParseError String
+
+data Token = 
+    Func Operator Token Token | 
+    Queri QueryDef 
+    deriving Show
 data QueryDef = 
     SuperType String|
     Color String | 
@@ -87,24 +93,41 @@ data Operator =
     Minus
     deriving Show
 
-seperator :: [String] -> [(Int, Int)] -> Token
-seperator ("(":rest) ((start,end):points) = case drop (end-start) rest of
-            " ":operator:" ":"(":rightRest -> Func (extractOperator operator) (seperator (take (end-start) rest) points)   (seperator (init rightRest) points)
-            [] -> seperator (take (end-start) rest) points
-            _ ->error "Operator need something to the right and left of it!"
-seperator [name, " ", value, ")"] _ = Queri (extractQueryDef (name, value))
-seperator a _ = error $ "Something went wrong tokenizing the input!\n" ++ (show a) 
+seperator :: [String] -> [(Int, Int)] -> Either ParseError Token
 
-extractQueryDef :: (String, String) -> QueryDef
-extractQueryDef ("SuperType", value) = SuperType value
-extractQueryDef ("CmcLT", value) = CMCLT (read value :: Int)
-extractQueryDef ("CmcMT", value) = CMCMT (read value :: Int)
-extractQueryDef ("CmcEQ", value) = CMCEQ (read value :: Int)
-extractQueryDef _ = error $ "This command was not valid"
+seperator ("(":rest) ((start,end):points) = case drop (end-start) rest of
+            " ":operator:" ":"(":rightRest -> case spawnBranch (extractOperator operator) (seperator (take (end-start) rest) points)  (seperator (init rightRest) points) of
+                Left a -> Left a
+                Right b -> Right b
+            [] -> seperator (take (end-start) rest) points
+            a -> Left $ ParseError $ "Could not parse input, error happened at: " ++ (show (concat a))
+seperator [name, " ", value, ")"] _ = case extractQueryDef (name, value) of 
+    Left a -> Left a
+    Right b -> Right $ Queri $ b
+seperator a _ = Left (ParseError ("Something went wrong tokenizing the input!\n" ++ (show a)))
+
+spawnBranch :: Operator -> (Either ParseError Token) -> (Either ParseError Token) -> (Either ParseError Token)
+spawnBranch _ (Left res1) _ = Left res1
+spawnBranch _ _ (Left res2) = Left res2
+spawnBranch operator (Right res1) (Right res2) = Right (Func operator res1 res2)
+
+
+
+
+extractQueryDef :: (String, String) -> Either ParseError QueryDef
+extractQueryDef ("SuperType", value) = Right $ SuperType value
+extractQueryDef ("CmcLT", value) = case readMaybe value :: Maybe Int of 
+    Just a -> Right $ CMCLT a
+    Nothing -> Left $ ParseError "Could not parse number from call to CmcLT"
+extractQueryDef ("CmcMT", value) = case readMaybe value :: Maybe Int of 
+    Just a -> Right $ CMCMT a
+    Nothing -> Left $ ParseError "Could not parse number from call to CmcMT"
+extractQueryDef ("CmcEQ", value) = case readMaybe value :: Maybe Int of 
+    Just a -> Right $ CMCEQ a
+    Nothing -> Left $ ParseError "Could not parse number from call to CmcEQ"
+extractQueryDef (a,b) = Left $ ParseError $ "The following command is invalid " ++ show a
 
 extractOperator "union" = Union
 extractOperator "intersect" = Intersect
 extractOperator "minus" = Minus
 extractOperator _ = error $ "This operator is not defined"
--- ((Is instant) union (Color R)) union ((Is instant) union (Color R))
--- (((Color Red) union (Color Blue)) union ((Is instant) union (Is Enchantment)))

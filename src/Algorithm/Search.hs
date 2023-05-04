@@ -17,14 +17,16 @@ import Data.Aeson.Encoding (value)
 
 search :: String -> IO String
 search q = do
-  let tokens = lexx q
+  case lexx q of
+      Left (ParseError message) -> return message
+      Right tokens ->do 
+        tree <- executeBottomQuery tokens
+        let queryRes = executeQuery tree
+        let hyperText = buildHtml queryRes
+        return hyperText
   --In order to avoid IO when performing the operators, we fetch all the "bottom" queries first, then perform
   --the operators on them based on the Tree
-  tree <- executeBottomQuery tokens
 
-  let queryRes = executeQuery tree
-  let hyperText = buildHtml queryRes
-  return hyperText
 
 
 
@@ -57,10 +59,7 @@ executeBottomQuery (Func operator left right) = do
 
 
 cardToHtml :: Card -> String
-cardToHtml (Card id_ scryfall_id lang name (Just oracle_text) (Just image_uri) type_line cmc) =
+cardToHtml (Card _ _ _ name (Just cmc) (Just oracle_text) type_line (Just mana_cost) _) =
   "<div class=\"card\" style=\"text-align:center\"><h2>" ++ unpack name ++ "</h2>" ++
-  "<img src=" ++ unpack image_uri ++ " width=\"200px\"/>"++
   "<p style=\"width:205px;margin: 0 auto;font-size:12;\">" ++ unpack oracle_text ++ "<p>"++" </div>"
-
-
 cardToHtml _ = "<h1>Could not load that card</h1>"

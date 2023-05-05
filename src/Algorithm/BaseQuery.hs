@@ -5,7 +5,10 @@ module Algorithm.BaseQuery
     cmcLT,
     cmcMT,
     cmcEQ,
-    Tree(..)
+    Tree(..),
+    CardFace(..),
+    ImageUris(..),
+    isLegal
     ) where
 import qualified Data.Text as T
 import Database.SQLite.Simple
@@ -14,6 +17,7 @@ import Data.Text (Text, isInfixOf)
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Algorithm.Lex (Operator)
 import GHC.Generics (Generic)
+import Web.Scotty (rescue)
 
 
 {- 
@@ -135,12 +139,12 @@ instance FromRow CardTypeLine where
 
 superType :: String -> IO Tree
 superType qry = do
-  res <- runQuerySimple "select card.id, card_face.oracle_text from card inner join card_face where card.id = card_face.card_id and card_face.oracle_text is not null" :: IO [CardTypeLine]
+  res <- runQuerySimple "select card.id, card_face.type_line from card inner join card_face where card.id = card_face.card_id and card_face.oracle_text is not null" :: IO [CardTypeLine]
   cards <- fetchCardsWithIds (typeLineFilter res (T.pack qry))
   return $ Holder cards
 
 typeLineFilter :: [CardTypeLine] -> Text -> [ID]
-typeLineFilter (card@(CardTypeLine id type_line):cards) qry = if qry `isInfixOf` type_line then ID id:typeLineFilter cards qry else typeLineFilter cards qry
+typeLineFilter ((CardTypeLine id_ type_line):cards) qry = if qry `isInfixOf` type_line then ID id_:typeLineFilter cards qry else typeLineFilter cards qry
 typeLineFilter [] _ = []
 --------------------------------------------------------------
 
@@ -166,4 +170,10 @@ cmcEQ value = do
   cards <- fetchCardsWithIds res
   return $ Holder cards
 
+isLegal :: String -> IO Tree
+isLegal qry = do
+  res <- runQueryNamed "select card.id from card inner join legalities where card.id = legalities.card_id and legalities.:val = legal" [":val" := qry] :: IO [ID]
+  cards <- fetchCardsWithIds res
+  return $ Holder cards
+  
 

@@ -12,14 +12,17 @@ import Data.Text (unpack)
 import Algorithm.Operator (union, intersect, minus)
 import Control.Monad.IO.Class
 import Data.Aeson.Encoding (value)
+import Data.Char (toLower)
+import qualified Data.Maybe
 
-
+--Probably a lot better way to do this, ex: reading from the database, but i want to avoid having IO everywhere
+formats = ["standard", "future", "historic", "gladiator", "pioneer", "explorer", "modern", "legacy", "pauper", "vintage", "penny", "commander", "brawl", "historicbrawl", "alchemy", "paupercommander", "duel", "oldschool", "premodern", "predh"]
 
 search :: String -> IO String
 search q = do
   case lexx q of
       Left (ParseError message) -> return message
-      Right tokens ->do 
+      Right tokens ->do
         tree <- executeBottomQuery tokens
         let queryRes = executeQuery tree
         let hyperText = buildHtml queryRes
@@ -48,18 +51,32 @@ executeBottomQuery (Queri (SuperType value)) = superType value
 executeBottomQuery (Queri (CMCLT value)) = cmcLT value
 executeBottomQuery (Queri (CMCMT value)) = cmcMT value
 executeBottomQuery (Queri (CMCEQ value)) = cmcEQ value
+executeBottomQuery (Queri (IsLegal value)) | map toLower value `elem` formats = isLegal $ map toLower value
 executeBottomQuery (Queri _) = error $ "Not implemented yet"
-executeBottomQuery (Func operator left right) = do 
+executeBottomQuery (Func operator left right) = do
   left <- executeBottomQuery left
   right <- executeBottomQuery right
   return $ Funct operator left right
 
 
-
-
-
 cardToHtml :: Card -> String
-cardToHtml (Card _ _ _ name (Just cmc) (Just oracle_text) type_line (Just mana_cost) _) =
-  "<div class=\"card\" style=\"text-align:center\"><h2>" ++ unpack name ++ "</h2>" ++
-  "<p style=\"width:205px;margin: 0 auto;font-size:12;\">" ++ unpack oracle_text ++ "<p>"++" </div>"
-cardToHtml _ = "<h1>Could not load that card</h1>"
+--Card with a single face!
+cardToHtml (Card _ _ _ _ _ _ _ _ [cardFace]) = singleCardFaceHTML cardFace
+
+--Multiface card!
+cardToHtml (Card _ _ _ _ _ _ _ _ cardFaces) = "<div style=\"text-align:center;\"><div style=\"display: inline-flex\">" ++ concatMap singleCardFaceHTML cardFaces ++"</div></div>"
+
+singleCardFaceHTML :: CardFace -> String
+singleCardFaceHTML (CardFace _ _ name cmc oracle_text type_line mana_cost (ImageUris _ _ _ image _ _ _ _)) =
+  "<div style=\"text-align:center;\">" ++
+    "<h2>" ++ unpack name ++ "</h2>" ++
+    "<img src=" ++ unpack image ++ " width=\"200px\"/>"++
+    "<p style=\"width:205px;margin: 5 auto;font-size:16;\">" ++  unpack (Data.Maybe.fromMaybe "" type_line) ++ "</p>"++
+    "<p style=\"width:205px;margin: 5 auto;font-size:12;\">" ++ unpack (Data.Maybe.fromMaybe "" oracle_text) ++ "</p>"++
+    "<p style=\"width:205px;margin: 5 auto;font-size:16;\">Mana cost: " ++  filter (`notElem` ['{','}']) (unpack (Data.Maybe.fromMaybe "" mana_cost)) ++ "</p>"++
+  " </div>"
+
+
+parseCMC :: Maybe Int -> String
+parseCMC (Just a) = show a
+parseCMC Nothing = ""

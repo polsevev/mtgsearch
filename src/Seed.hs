@@ -56,7 +56,7 @@ data Legalities =  Legalities{
     explorer::Text,
     modern::Text,
     legacy::Text,
-    pauper::Text, 
+    pauper::Text,
     vintage::Text,
     penny::Text,
     commander::Text,
@@ -90,7 +90,7 @@ instance FromJSON Card where
         c_name <- v.: "name"
         c_id <- v .: "id"
         lang <- v .: "lang"
-        c_cmc <- v .:? "cmc" 
+        c_cmc <- v .:? "cmc"
         c_oracle_text <- v .:? "oracle_text"
         c_type_line <- v .:? "type_line"
         c_mana_cost <- v .:? "mana_cost"
@@ -161,12 +161,17 @@ seedData d = do
     execute_ conn "CREATE TABLE IF NOT EXISTS card (id INTEGER PRIMARY KEY, scryfall_id TEXT, lang TEXT, name TEXT, cmc INT, oracle_text TEXT, type_line TEXT, mana_cost TEXT)"
     execute_ conn "CREATE TABLE IF NOT EXISTS card_face (id INTEGER PRIMARY KEY,card_id INT, name TEXT, cmc INT, oracle_text TEXT, type_line TEXT, mana_cost TEXT)"
     execute_ conn "CREATE TABLE IF NOT EXISTS image_uris (id INTEGER PRIMARY KEY, card_face_id INT, small TEXT, normal TEXT, large TEXT, png TEXT, art_crop TEXT, border_crop TEXT)"
-    execute_ conn "CREATE TABLE IF NOT EXISTS legalities (id INTEGER PRIMARY KEY, card_id INT, standard BOOL, future BOOL, historic BOOL, gladiator BOOL, pioneer BOOL, explorer BOOL, modern BOOL, legacy BOOL, pauper BOOL, vintage BOOL, penny BOOL, commander BOOL, brawl BOOL, historicbrawl BOOL, alchemy BOOL, paupercommander BOOL, duel BOOL, oldschool BOOL, premodern BOOL, predh BOOL)"
+    execute_ conn "CREATE TABLE IF NOT EXISTS legalities (id INTEGER PRIMARY KEY, card_id INT, standard TEXT, future TEXT, historic TEXT, gladiator TEXT, pioneer TEXT, explorer TEXT, modern TEXT, legacy TEXT, pauper TEXT, vintage TEXT, penny TEXT, commander TEXT, brawl TEXT, historicbrawl TEXT, alchemy TEXT, paupercommander TEXT, duel TEXT, oldschool TEXT, premodern TEXT, predh TEXT)"
 
 
     case d of
         Left err -> putStrLn err
-        Right ps -> insertCards conn 0 0 ps
+        Right ps -> do
+            collectedCards <- collectCards conn 0 0 ps
+            fillDb conn collectedCards
+            return ()
+
+
 
 
 
@@ -179,52 +184,56 @@ getJSONWeb = fetchData
 
 ---------------------------------------------------------------------------------------------------------
 
-insertCards :: Connection -> Int -> Int -> [Card] -> IO()
+collectCards :: Connection -> Int -> Int -> [Card] -> IO ([DbCard], [Legalities], [(CardFace, ImageUris)])
 
 --Skip illegal card types that are not relevant (These are difficult to parse as they contain non standard card formats)
-insertCards conn card_id card_face_id ((Card _ _ _ layout _ _ _ _ _ _ _):cards) | unpack layout `Prelude.elem` ["scheme", "token", "double_faced_token", "emblem", "art_series", "vanguard", "host"] =
-    insertCards conn card_id card_face_id cards
+collectCards conn card_id card_face_id ((Card _ _ _ layout _ _ _ _ _ _ _):cards) | unpack layout `Prelude.elem` ["scheme", "token", "double_faced_token", "emblem", "art_series", "vanguard", "host"] =
+    collectCards conn card_id card_face_id cards
 
 --This should in theory never happen, however it is here for full coverage
-insertCards _ _ _ (card@(Card _ _ _ _ _ _ _ _ Nothing Nothing _):_) = do
+collectCards _ _ _ (card@(Card _ _ _ _ _ _ _ _ Nothing Nothing _):_) = do
     error $ "This cannot happen! No card can not have cardfaces as well as no image_uris on top level. Please fix ur data!"
 
 --This will be ran when the card is single face (most cards)
-insertCards conn card_id card_face_id (card@(Card _ _ c_name _ c_cmc c_oracle_text c_type_line c_mana_cost Nothing image_uris@(Just (ImageUris _ small normal large png art_crop border_crop)) legal):cards) = do
-    let legalities = insertIdLegalities legal card_id 
+collectCards conn card_id card_face_id (card@(Card _ _ c_name _ c_cmc c_oracle_text c_type_line c_mana_cost Nothing image_uris@(Just (ImageUris _ small normal large png art_crop border_crop)) legal):cards) = do
+    let legalities = insertIdLegalities legal card_id
     let cardFace = CardFace (Just card_face_id) (Just card_id) c_name c_cmc c_oracle_text Nothing c_type_line c_mana_cost
     let imageUris = ImageUris (Just card_face_id) small normal large png art_crop border_crop
     let dbCard = cardToDbCard card_id card
-    insertRows conn dbCard legalities [(cardFace, imageUris)]
-    insertCards conn (card_id + 1) (card_face_id + 1) cards
+    --insertRows conn dbCard legalities [(cardFace, imageUris)]
+    (dbCards, legalitiesRest, cfius) <- collectCards conn (card_id + 1) (card_face_id + 1) cards
+    return (dbCard:dbCards, legalities:legalitiesRest, (cardFace, imageUris):cfius)
 
 --This will be ran when a card is multi face
-insertCards conn card_id card_face_id (card@(Card _ _ _ _ _ _ _ _ (Just card_faces) Nothing legal):cards) = do
-    let legalities = insertIdLegalities legal card_id 
+collectCards conn card_id card_face_id (card@(Card _ _ _ _ _ _ _ _ (Just card_faces) Nothing legal):cards) = do
+    let legalities = insertIdLegalities legal card_id
     let dbCard = cardToDbCard card_id card
     let cardFacesAndImageUris = addCardIdToCardFaces card_id card_face_id card_faces
-    insertRows conn dbCard legalities cardFacesAndImageUris
-    insertCards conn (card_id + 1) (card_face_id + Prelude.length cardFacesAndImageUris+1) cards
+    --insertRows conn dbCard legalities cardFacesAndImageUris
+    (dbCards, legalitiesRest, cfius) <- collectCards conn (card_id + 1) (card_face_id + Prelude.length cardFacesAndImageUris+1) cards
+    return (dbCard:dbCards, legalities:legalitiesRest, cardFacesAndImageUris ++ cfius)
 
 --This will be ran when a card contains multiple cards on the front
-insertCards conn card_id card_face_id (card@(Card _ _ _ _ _ _ _ _ (Just card_faces) (Just image_uris) legal):cards) = do
-    let legalities = insertIdLegalities legal card_id 
+collectCards conn card_id card_face_id (card@(Card _ _ _ _ _ _ _ _ (Just card_faces) (Just image_uris) legal):cards) = do
+    let legalities = insertIdLegalities legal card_id
     let dbCard = cardToDbCard card_id card
     let cardFacesAndImageUris =   addCardIdAndImageUrisToCardFaces card_id card_face_id image_uris card_faces
-    insertRows conn dbCard legalities cardFacesAndImageUris
-    insertCards conn (card_id + 1) (card_face_id + Prelude.length cardFacesAndImageUris+1) cards
+    --insertRows conn dbCard legalities cardFacesAndImageUris
+    (dbCards, legalitiesRest, cfius) <- collectCards conn (card_id + 1) (card_face_id + Prelude.length cardFacesAndImageUris+1) cards
+    return (dbCard:dbCards, legalities:legalitiesRest, cardFacesAndImageUris ++ cfius)
 
-insertCards _ _ _  [] = return ()
+collectCards _ _ _  [] = return ([],[],[])
 
 
-
+-- Helper functions for collectCards
 
 
 insertIdLegalities :: Legalities -> Int -> Legalities
 insertIdLegalities (Legalities Nothing a b c d e f g h i j k l m n o p q r s t) id = Legalities (Just id) a b c d e f g h i j k l m n o p q r s t
 insertIdLegalities _ _ = error $ "Illegal id insert into data legality"
 
----------------------------------------------------------------------------------------------------------
+
+
 addCardIdAndImageUrisToCardFaces :: Int -> Int -> ImageUris -> [CardFace] -> [(CardFace, ImageUris)]
 addCardIdAndImageUrisToCardFaces card_id card_face_id image_uri (card_face:faces) = addCardIdAndImageUrisToCardFace card_id card_face_id image_uri card_face : addCardIdAndImageUrisToCardFaces card_id (card_face_id+1) image_uri faces
 addCardIdAndImageUrisToCardFaces _ _ _ [] = []
@@ -246,24 +255,31 @@ addCardIdToCardFaces :: Int -> Int -> [CardFace] -> [(CardFace, ImageUris)]
 addCardIdToCardFaces card_id card_face_id (card:cards) = addCardIdToCardFace card_id card_face_id card : addCardIdToCardFaces card_id (card_face_id +1) cards
 addCardIdToCardFaces _ _ [] = []
 
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+fillDb :: Connection -> ([DbCard], [Legalities], [(CardFace, ImageUris)]) -> IO ()
+fillDb conn (dbCards, legalities, combo) = do
+    let (cardFaces, imageUris) = unzip combo
+    executeMany conn "INSERT INTO card (id, scryfall_id, lang, name, cmc, oracle_text, type_line, mana_cost ) VALUES (?,?,?,?,?,?,?,?)" dbCards
+    executeMany conn "INSERT INTO card_face (id, card_id, name, cmc, oracle_text, type_line, mana_cost) VALUES (?,?,?,?,?,?,?)" cardFaces
+    executeMany conn "INSERT INTO image_uris (card_face_id, small , normal , large , png , art_crop, border_crop) VALUES (?,?,?,?,?,?,?)" imageUris
+    executeMany conn "INSERT INTO legalities (card_id, standard  , future  , historic  , gladiator  , pioneer  , explorer  , modern  , legacy  , pauper  , vintage  , penny  , commander  , brawl  , historicbrawl  , alchemy  , paupercommander  , duel  , oldschool  , premodern, predh ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)" legalities
+-- insertRows :: Connection -> DbCard -> Legalities -> [(CardFace, ImageUris)] -> IO()
+-- insertRows conn dbCard legalities face_uri = do
+--     mapM_  (insertCardFaceImageUris conn) face_uri
+--     insertCard conn dbCard
+--     insertLegalities conn legalities
+
+-- insertCardFaceImageUris :: Connection -> (CardFace, ImageUris) -> IO ()
+-- insertCardFaceImageUris conn (cardFace, imageUris) = do
+--     execute conn "INSERT INTO card_face (id, card_id, name, cmc, oracle_text, type_line, mana_cost) VALUES (?,?,?,?,?,?,?)" cardFace
+--     execute conn "INSERT INTO image_uris (card_face_id, small , normal , large , png , art_crop, border_crop) VALUES (?,?,?,?,?,?,?)" imageUris
 
 
-insertRows :: Connection -> DbCard -> Legalities -> [(CardFace, ImageUris)] -> IO()
-insertRows conn dbCard legalities face_uri = do
-    mapM_  (insertCardFaceImageUris conn) face_uri
-    insertCard conn dbCard
-    insertLegalities conn legalities
+-- insertCard :: Connection -> DbCard -> IO ()
+-- insertCard conn card = do
+--     execute conn "INSERT INTO card (id, scryfall_id, lang, name, cmc, oracle_text, type_line, mana_cost ) VALUES (?,?,?,?,?,?,?,?)" card
 
-insertCardFaceImageUris :: Connection -> (CardFace, ImageUris) -> IO ()
-insertCardFaceImageUris conn (cardFace, imageUris) = do
-    execute conn "INSERT INTO card_face (id, card_id, name, cmc, oracle_text, type_line, mana_cost) VALUES (?,?,?,?,?,?,?)" cardFace
-    execute conn "INSERT INTO image_uris (card_face_id, small , normal , large , png , art_crop, border_crop) VALUES (?,?,?,?,?,?,?)" imageUris
-
-
-insertCard :: Connection -> DbCard -> IO ()
-insertCard conn card = do
-    execute conn "INSERT INTO card (id, scryfall_id, lang, name, cmc, oracle_text, type_line, mana_cost ) VALUES (?,?,?,?,?,?,?,?)" card
-
-insertLegalities :: Connection -> Legalities -> IO ()
-insertLegalities conn legalities = do
-    execute conn "INSERT INTO legalities (card_id, standard  , future  , historic  , gladiator  , pioneer  , explorer  , modern  , legacy  , pauper  , vintage  , penny  , commander  , brawl  , historicbrawl  , alchemy  , paupercommander  , duel  , oldschool  , premodern, predh ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)" legalities
+-- insertLegalities :: Connection -> Legalities -> IO ()
+-- insertLegalities conn legalities = do
+--     execute conn "INSERT INTO legalities (card_id, standard  , future  , historic  , gladiator  , pioneer  , explorer  , modern  , legacy  , pauper  , vintage  , penny  , commander  , brawl  , historicbrawl  , alchemy  , paupercommander  , duel  , oldschool  , premodern, predh ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)" legalities

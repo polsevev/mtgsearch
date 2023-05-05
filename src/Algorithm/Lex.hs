@@ -85,7 +85,8 @@ data QueryDef =
     Color String | 
     CMCLT Int | 
     CMCMT Int | 
-    CMCEQ Int 
+    CMCEQ Int |
+    IsLegal String
     deriving Show
 data Operator = 
     Union |
@@ -125,6 +126,7 @@ extractQueryDef ("CmcMT", value) = case readMaybe value :: Maybe Int of
 extractQueryDef ("CmcEQ", value) = case readMaybe value :: Maybe Int of 
     Just a -> Right $ CMCEQ a
     Nothing -> Left $ ParseError "Could not parse number from call to CmcEQ"
+extractQueryDef ("IsLegal", value) = Right $ IsLegal value 
 extractQueryDef (a,b) = Left $ ParseError $ "The following command is invalid " ++ show a
 
 extractOperator "union" = Union

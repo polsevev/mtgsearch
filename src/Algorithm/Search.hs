@@ -67,7 +67,7 @@ cardToHtml (Card _ _ _ _ _ _ _ _ [cardFace]) = singleCardFaceHTML cardFace
 cardToHtml (Card _ _ _ _ _ _ _ _ cardFaces) = "<div style=\"text-align:center;\"><div style=\"display: inline-flex\">" ++ concatMap singleCardFaceHTML cardFaces ++"</div></div>"
 
 singleCardFaceHTML :: CardFace -> String
-singleCardFaceHTML (CardFace _ _ name cmc oracle_text type_line mana_cost (ImageUris _ _ _ image _ _ _ _)) =
+singleCardFaceHTML (CardFace _ _ name _ oracle_text type_line mana_cost (ImageUris _ _ _ image _ _ _ _)) =
   "<div style=\"text-align:center;\">" ++
     "<h2>" ++ unpack name ++ "</h2>" ++
     "<img src=" ++ unpack image ++ " width=\"200px\"/>"++
@@ -76,7 +76,3 @@ singleCardFaceHTML (CardFace _ _ name cmc oracle_text type_line mana_cost (Image
     "<p style=\"width:205px;margin: 5 auto;font-size:16;\">Mana cost: " ++  filter (`notElem` ['{','}']) (unpack (Data.Maybe.fromMaybe "" mana_cost)) ++ "</p>"++
   " </div>"
 
-
-parseCMC :: Maybe Int -> String
-parseCMC (Just a) = show a
-parseCMC Nothing = ""

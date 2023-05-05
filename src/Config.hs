@@ -6,13 +6,14 @@ import Data.Aeson
 import Data.Text
 
 import qualified Data.ByteString.Lazy as B
+import qualified Data.ByteString.Lazy.Char8 as C8 (pack)
 import GHC.Generics
 import Control.Exception (try)
-import Data.ByteString.Builder (lazyByteString)
-import qualified Data.Aeson.Key as B
-import qualified Data.Data as B
+
 import GHC.IO.Exception
 
+import System.IO.Strict as L
+import Data.ByteString.Builder (lazyByteString)
 
 
 data Config = Config{
@@ -31,10 +32,10 @@ configFile = "./Config/config.json"
 
 getJSON :: IO B.ByteString
 getJSON = do
-    a <- try $ B.readFile configFile :: IO (Either IOException B.ByteString )
+    a <- try $ L.readFile configFile :: IO (Either IOException String)
     case a of
-        Right a -> return a
-        Left b -> error $ "Could not load configuration file"
+        Right a2 -> return $ C8.pack a2
+        Left b -> error $ "Could not load configuration file " ++ (show b)
 
 
 
@@ -51,11 +52,11 @@ readConfig = do
 getConfig :: IO Config
 getConfig = extract readConfig
 
-getDataSeedPath ::IO (String)
+getDataSeedPath ::IO String
 getDataSeedPath = do
     dataseedpath <$> getConfig
 
-getDbPath ::IO (String)
+getDbPath ::IO String
 getDbPath = do
     dbPath <$> getConfig
 

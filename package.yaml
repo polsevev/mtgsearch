@@ -29,6 +29,7 @@ dependencies:
 - directory
 - http-client
 - http-client-tls
+- strict
 ghc-options:
 - -Wall
 - -Wcompat

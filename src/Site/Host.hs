@@ -17,7 +17,7 @@ host = scotty 3000 $ do
             --liftIO (putStrLn $ "\nOutput! " ++ show (lexx query))
             --cards <- liftIO (search query)
             result <- liftIO (search query)
-            html $ mconcat ["<h1>", pack result, "</h1>"]
+            html $ mconcat [pack result]
 
   get "/" $ file "src/Site/Static/index.html"
 

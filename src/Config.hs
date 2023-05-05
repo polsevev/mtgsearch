@@ -32,10 +32,10 @@ configFile = "./Config/config.json"
 
 getJSON :: IO B.ByteString
 getJSON = do
-    a <- try $ L.readFile configFile :: IO (Either IOException String)
+    a <- try $ B.readFile configFile :: IO (Either IOException B.ByteString )
     case a of
-        Right a2 -> return $ C8.pack a2
-        Left b -> error $ "Could not load configuration file " ++ (show b)
+        Right a -> return a
+        Left b -> error $ "Could not load configuration file"
 
 
 

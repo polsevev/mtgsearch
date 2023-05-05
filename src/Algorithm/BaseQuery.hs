@@ -96,36 +96,36 @@ data Card = Card
 instance Eq Card where
   (==) (Card id_ _ _ _ _ _ _ _ _ ) (Card id2_ _ _ _ _ _ _ _ _ ) = id_ == id2_
 
-
+--Re design fetching of cards by id to only gather the dbPath from config once!
 fetchCardsWithIds :: [ID] -> IO [Card]
-fetchCardsWithIds = mapM fetchCardWithId
+fetchCardsWithIds ids = do 
+  dbPath <- getDbPath
+  conn <- open dbPath
+  mapM (fetchCardWithId conn) ids 
 
-fetchCardWithId :: ID -> IO Card
-fetchCardWithId (ID id) = do
-  tempCardFaces <- runQueryNamed "select id, card_id, name, cmc, oracle_text, type_line, mana_cost from card_face where card_id = :val" [":val" := id] :: IO [TempCardFace]
+fetchCardWithId :: Connection -> ID -> IO Card
+fetchCardWithId conn (ID id)  = do
+  tempCardFaces <- runQueryNamed conn "select id, card_id, name, cmc, oracle_text, type_line, mana_cost from card_face where card_id = :val" [":val" := id] :: IO [TempCardFace]
   --We are fetchinig based on primary key, so we know the result is a single data
-  [TempCard id scryfall_id lang name cmc oracle_text type_line mana_cost] <- runQueryNamed "select id, scryfall_id, lang, name, cmc, oracle_text,type_line, mana_cost from card where id = :val" [":val" := id] :: IO [TempCard]
-  cardFaces <- mapM fetchImageUris tempCardFaces
+  [TempCard id scryfall_id lang name cmc oracle_text type_line mana_cost] <- runQueryNamed conn "select id, scryfall_id, lang, name, cmc, oracle_text,type_line, mana_cost from card where id = :val" [":val" := id] :: IO [TempCard]
+  cardFaces <- mapM (fetchImageUris conn) tempCardFaces
   return $ Card id scryfall_id lang name cmc oracle_text type_line mana_cost cardFaces
 
-fetchImageUris :: TempCardFace -> IO (CardFace)
-fetchImageUris (TempCardFace id card_id name cmc oracle_text type_line mana_cost) = do
+fetchImageUris ::Connection -> TempCardFace -> IO (CardFace)
+fetchImageUris conn (TempCardFace id card_id name cmc oracle_text type_line mana_cost) = do
   --We can do this only because a ImageUri row is 1:1 with CardFace in the database
-  [imageUri] <- runQueryNamed "select id, card_face_id, small, normal, large, png, art_crop, border_crop from image_uris where card_face_id = :val" [":val" := id] :: IO [ImageUris]
+  [imageUri] <- runQueryNamed conn "select id, card_face_id, small, normal, large, png, art_crop, border_crop from image_uris where card_face_id = :val" [":val" := id] :: IO [ImageUris]
   return $ CardFace id card_id name cmc oracle_text type_line mana_cost imageUri
 
 
 
-runQuerySimple :: (FromRow a) =>  Query -> IO [a]
-runQuerySimple str = do
-  dbPath <- getDbPath
-  conn <- open dbPath
+runQuerySimple :: (FromRow a) => Connection ->  Query -> IO [a]
+runQuerySimple conn str = do
+
   query_ conn str ::(FromRow a) =>  IO [a];
 
-runQueryNamed ::(FromRow a) =>  Query -> [NamedParam] -> IO [a]
-runQueryNamed qur parm = do
-  dbPath <- getDbPath
-  conn <- open dbPath
+runQueryNamed ::(FromRow a) => Connection -> Query -> [NamedParam] -> IO [a]
+runQueryNamed conn qur parm = do
   queryNamed conn qur parm :: (FromRow a) =>  IO [a]
 
 
@@ -139,7 +139,9 @@ instance FromRow CardTypeLine where
 
 superType :: String -> IO Tree
 superType qry = do
-  res <- runQuerySimple "select card.id, card_face.type_line from card inner join card_face where card.id = card_face.card_id and card_face.oracle_text is not null" :: IO [CardTypeLine]
+  dbPath <- getDbPath
+  conn <- open dbPath
+  res <- runQuerySimple conn "select card.id, card_face.type_line from card inner join card_face where card.id = card_face.card_id and card_face.oracle_text is not null" :: IO [CardTypeLine]
   cards <- fetchCardsWithIds (typeLineFilter res (T.pack qry))
   return $ Holder cards
 
@@ -154,25 +156,33 @@ instance FromRow ID where
 
 cmcLT :: Int -> IO Tree
 cmcLT value = do
-  res <- runQueryNamed "select card.id from card inner join card_face where card.id = card_face.card_id and (card.cmc < :val or card_face.cmc < :val)" [":val" := value] :: IO [ID]
+  dbPath <- getDbPath
+  conn <- open dbPath
+  res <- runQueryNamed conn "select card.id from card inner join card_face where card.id = card_face.card_id and (card.cmc < :val or card_face.cmc < :val)" [":val" := value] :: IO [ID]
   cards <- fetchCardsWithIds res
   return $ Holder cards
 
 cmcMT :: Int -> IO Tree
 cmcMT value = do
-  res <- runQueryNamed "select card.id from card inner join card_face where card.id = card_face.card_id and (card.cmc > :val or card_face.cmc > :val)" [":val" := value] :: IO [ID]
+  dbPath <- getDbPath
+  conn <- open dbPath
+  res <- runQueryNamed conn "select card.id from card inner join card_face where card.id = card_face.card_id and (card.cmc > :val or card_face.cmc > :val)" [":val" := value] :: IO [ID]
   cards <- fetchCardsWithIds res
   return $ Holder cards
 
 cmcEQ :: Int -> IO Tree
 cmcEQ value = do
-  res <- runQueryNamed "select card.id from card inner join card_face where card.id = card_face.card_id and (card.cmc = :val or card_face.cmc = :val)" [":val" := value] :: IO [ID]
+  dbPath <- getDbPath
+  conn <- open dbPath
+  res <- runQueryNamed conn "select card.id from card inner join card_face where card.id = card_face.card_id and (card.cmc = :val or card_face.cmc = :val)" [":val" := value] :: IO [ID]
   cards <- fetchCardsWithIds res
   return $ Holder cards
 
 isLegal :: String -> IO Tree
 isLegal qry = do
-  res <- runQueryNamed "select card.id from card inner join legalities where card.id = legalities.card_id and legalities.:val = legal" [":val" := qry] :: IO [ID]
+  dbPath <- getDbPath
+  conn <- open dbPath
+  res <- runQueryNamed conn "select card.id from card inner join legalities where card.id = legalities.card_id and legalities.:val = legal" [":val" := qry] :: IO [ID]
   cards <- fetchCardsWithIds res
   return $ Holder cards
   

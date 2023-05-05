@@ -264,22 +264,3 @@ fillDb conn (dbCards, legalities, combo) = do
     executeMany conn "INSERT INTO card_face (id, card_id, name, cmc, oracle_text, type_line, mana_cost) VALUES (?,?,?,?,?,?,?)" cardFaces
     executeMany conn "INSERT INTO image_uris (card_face_id, small , normal , large , png , art_crop, border_crop) VALUES (?,?,?,?,?,?,?)" imageUris
     executeMany conn "INSERT INTO legalities (card_id, standard  , future  , historic  , gladiator  , pioneer  , explorer  , modern  , legacy  , pauper  , vintage  , penny  , commander  , brawl  , historicbrawl  , alchemy  , paupercommander  , duel  , oldschool  , premodern, predh ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)" legalities
--- insertRows :: Connection -> DbCard -> Legalities -> [(CardFace, ImageUris)] -> IO()
--- insertRows conn dbCard legalities face_uri = do
---     mapM_  (insertCardFaceImageUris conn) face_uri
---     insertCard conn dbCard
---     insertLegalities conn legalities
-
--- insertCardFaceImageUris :: Connection -> (CardFace, ImageUris) -> IO ()
--- insertCardFaceImageUris conn (cardFace, imageUris) = do
---     execute conn "INSERT INTO card_face (id, card_id, name, cmc, oracle_text, type_line, mana_cost) VALUES (?,?,?,?,?,?,?)" cardFace
---     execute conn "INSERT INTO image_uris (card_face_id, small , normal , large , png , art_crop, border_crop) VALUES (?,?,?,?,?,?,?)" imageUris
-
-
--- insertCard :: Connection -> DbCard -> IO ()
--- insertCard conn card = do
---     execute conn "INSERT INTO card (id, scryfall_id, lang, name, cmc, oracle_text, type_line, mana_cost ) VALUES (?,?,?,?,?,?,?,?)" card
-
--- insertLegalities :: Connection -> Legalities -> IO ()
--- insertLegalities conn legalities = do
---     execute conn "INSERT INTO legalities (card_id, standard  , future  , historic  , gladiator  , pioneer  , explorer  , modern  , legacy  , pauper  , vintage  , penny  , commander  , brawl  , historicbrawl  , alchemy  , paupercommander  , duel  , oldschool  , premodern, predh ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)" legalities

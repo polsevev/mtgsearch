@@ -8,16 +8,14 @@ module Algorithm.BaseQuery
     Tree(..),
     CardFace(..),
     ImageUris(..),
-    isLegal
+    isLegal,
+    notSuperType
     ) where
 import qualified Data.Text as T
 import Database.SQLite.Simple
 import Config (getDbPath)
 import Data.Text (Text, isInfixOf)
-import Control.Monad.IO.Class (MonadIO(liftIO))
 import Algorithm.Lex (Operator)
-import GHC.Generics (Generic)
-import Web.Scotty (rescue)
 
 
 {- 
@@ -98,10 +96,10 @@ instance Eq Card where
 
 --Re design fetching of cards by id to only gather the dbPath from config once!
 fetchCardsWithIds :: [ID] -> IO [Card]
-fetchCardsWithIds ids = do 
+fetchCardsWithIds ids = do
   dbPath <- getDbPath
   conn <- open dbPath
-  mapM (fetchCardWithId conn) ids 
+  mapM (fetchCardWithId conn) ids
 
 fetchCardWithId :: Connection -> ID -> IO Card
 fetchCardWithId conn (ID id)  = do
@@ -121,7 +119,6 @@ fetchImageUris conn (TempCardFace id card_id name cmc oracle_text type_line mana
 
 runQuerySimple :: (FromRow a) => Connection ->  Query -> IO [a]
 runQuerySimple conn str = do
-
   query_ conn str ::(FromRow a) =>  IO [a];
 
 runQueryNamed ::(FromRow a) => Connection -> Query -> [NamedParam] -> IO [a]
@@ -142,13 +139,22 @@ superType qry = do
   dbPath <- getDbPath
   conn <- open dbPath
   res <- runQuerySimple conn "select card.id, card_face.type_line from card inner join card_face where card.id = card_face.card_id and card_face.oracle_text is not null" :: IO [CardTypeLine]
-  cards <- fetchCardsWithIds (typeLineFilter res (T.pack qry))
+  cards <- fetchCardsWithIds (typeLineFilter res (T.pack qry) True)
   return $ Holder cards
 
-typeLineFilter :: [CardTypeLine] -> Text -> [ID]
-typeLineFilter ((CardTypeLine id_ type_line):cards) qry = if qry `isInfixOf` type_line then ID id_:typeLineFilter cards qry else typeLineFilter cards qry
-typeLineFilter [] _ = []
+typeLineFilter :: [CardTypeLine] -> Text -> Bool -> [ID]
+typeLineFilter ((CardTypeLine id_ type_line):cards) qry True = if qry `isInfixOf` type_line then ID id_:typeLineFilter cards qry True else typeLineFilter cards qry True
+typeLineFilter ((CardTypeLine id_ type_line):cards) qry False = if not (qry `isInfixOf` type_line) then ID id_:typeLineFilter cards qry False else typeLineFilter cards qry False
+typeLineFilter [] _ _ = []
 --------------------------------------------------------------
+notSuperType :: String -> IO Tree
+notSuperType qry = do
+  dbPath <- getDbPath
+  conn <- open dbPath
+  res <- runQuerySimple conn "select card.id, card_face.type_line from card inner join card_face where card.id = card_face.card_id and card_face.oracle_text is not null" :: IO [CardTypeLine]
+  cards <- fetchCardsWithIds (typeLineFilter res (T.pack qry) False)
+  return $ Holder cards
+
 
 newtype ID = ID Int
 instance FromRow ID where
@@ -182,8 +188,8 @@ isLegal :: String -> IO Tree
 isLegal qry = do
   dbPath <- getDbPath
   conn <- open dbPath
-  res <- runQueryNamed conn "select card.id from card inner join legalities where card.id = legalities.card_id and legalities.:val = legal" [":val" := qry] :: IO [ID]
+  res <- runQueryNamed conn "select card.id from card inner join legalities where card.id = legalities.card_id and format = :val and is_legal=1" [":val" := qry] :: IO [ID]
   cards <- fetchCardsWithIds res
   return $ Holder cards
-  
+
 

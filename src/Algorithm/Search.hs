@@ -48,6 +48,7 @@ buildHtml = concatMap cardToHtml
 
 executeBottomQuery :: Token -> IO Tree
 executeBottomQuery (Queri (SuperType value)) = superType value
+executeBottomQuery (Queri (NotSuperType value)) = notSuperType value
 executeBottomQuery (Queri (CMCLT value)) = cmcLT value
 executeBottomQuery (Queri (CMCMT value)) = cmcMT value
 executeBottomQuery (Queri (CMCEQ value)) = cmcEQ value

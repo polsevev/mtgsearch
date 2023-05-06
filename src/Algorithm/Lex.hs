@@ -82,6 +82,7 @@ data Token =
     deriving Show
 data QueryDef = 
     SuperType String|
+    NotSuperType String |
     Color String | 
     CMCLT Int | 
     CMCMT Int | 
@@ -117,6 +118,7 @@ spawnBranch operator (Right res1) (Right res2) = Right (Func operator res1 res2)
 
 extractQueryDef :: (String, String) -> Either ParseError QueryDef
 extractQueryDef ("SuperType", value) = Right $ SuperType value
+extractQueryDef ("NotSuperType", value) = Right $ NotSuperType value
 extractQueryDef ("CmcLT", value) = case readMaybe value :: Maybe Int of 
     Just a -> Right $ CMCLT a
     Nothing -> Left $ ParseError "Could not parse number from call to CmcLT"

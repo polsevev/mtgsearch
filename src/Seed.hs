@@ -71,6 +71,8 @@ data Legalities =  Legalities{
 }deriving (Show,Generic)
 instance FromJSON Legalities
 
+data DbLegality = DbLegality Int Text Bool
+
 data Card = Card{
     c_id :: Text,
     lang :: Text,
@@ -115,7 +117,9 @@ instance FromJSON Card where
 
 data DbCard = DbCard Int Text Text Text Text (Maybe Float) (Maybe Text) (Maybe Text) (Maybe Text)
 
-instance ToRow Legalities
+instance ToRow DbLegality where
+    toRow(DbLegality id format legalStatus) =
+        toRow(id, format, legalStatus)
 
 instance ToRow DbCard where
     toRow (DbCard id scryfall_id lang name layout cmc oracle_text type_line mana_cost) =
@@ -161,7 +165,7 @@ seedData d = do
     execute_ conn "CREATE TABLE IF NOT EXISTS card (id INTEGER PRIMARY KEY, scryfall_id TEXT, lang TEXT, name TEXT, cmc INT, oracle_text TEXT, type_line TEXT, mana_cost TEXT)"
     execute_ conn "CREATE TABLE IF NOT EXISTS card_face (id INTEGER PRIMARY KEY,card_id INT, name TEXT, cmc INT, oracle_text TEXT, type_line TEXT, mana_cost TEXT)"
     execute_ conn "CREATE TABLE IF NOT EXISTS image_uris (id INTEGER PRIMARY KEY, card_face_id INT, small TEXT, normal TEXT, large TEXT, png TEXT, art_crop TEXT, border_crop TEXT)"
-    execute_ conn "CREATE TABLE IF NOT EXISTS legalities (id INTEGER PRIMARY KEY, card_id INT, standard TEXT, future TEXT, historic TEXT, gladiator TEXT, pioneer TEXT, explorer TEXT, modern TEXT, legacy TEXT, pauper TEXT, vintage TEXT, penny TEXT, commander TEXT, brawl TEXT, historicbrawl TEXT, alchemy TEXT, paupercommander TEXT, duel TEXT, oldschool TEXT, premodern TEXT, predh TEXT)"
+    execute_ conn "CREATE TABLE IF NOT EXISTS legalities (id INTEGER PRIMARY KEY,card_id INT, format TEXT, is_legal BOOL)"
 
 
     case d of
@@ -184,7 +188,7 @@ getJSONWeb = fetchData
 
 ---------------------------------------------------------------------------------------------------------
 
-collectCards :: Connection -> Int -> Int -> [Card] -> IO ([DbCard], [Legalities], [(CardFace, ImageUris)])
+collectCards :: Connection -> Int -> Int -> [Card] -> IO ([DbCard], [DbLegality], [(CardFace, ImageUris)])
 
 --Skip illegal card types that are not relevant (These are difficult to parse as they contain non standard card formats)
 collectCards conn card_id card_face_id ((Card _ _ _ layout _ _ _ _ _ _ _):cards) | unpack layout `Prelude.elem` ["scheme", "token", "double_faced_token", "emblem", "art_series", "vanguard", "host"] =
@@ -202,7 +206,7 @@ collectCards conn card_id card_face_id (card@(Card _ _ c_name _ c_cmc c_oracle_t
     let dbCard = cardToDbCard card_id card
     --insertRows conn dbCard legalities [(cardFace, imageUris)]
     (dbCards, legalitiesRest, cfius) <- collectCards conn (card_id + 1) (card_face_id + 1) cards
-    return (dbCard:dbCards, legalities:legalitiesRest, (cardFace, imageUris):cfius)
+    return (dbCard:dbCards, legalities++legalitiesRest, (cardFace, imageUris):cfius)
 
 --This will be ran when a card is multi face
 collectCards conn card_id card_face_id (card@(Card _ _ _ _ _ _ _ _ (Just card_faces) Nothing legal):cards) = do
@@ -211,7 +215,7 @@ collectCards conn card_id card_face_id (card@(Card _ _ _ _ _ _ _ _ (Just card_fa
     let cardFacesAndImageUris = addCardIdToCardFaces card_id card_face_id card_faces
     --insertRows conn dbCard legalities cardFacesAndImageUris
     (dbCards, legalitiesRest, cfius) <- collectCards conn (card_id + 1) (card_face_id + Prelude.length cardFacesAndImageUris+1) cards
-    return (dbCard:dbCards, legalities:legalitiesRest, cardFacesAndImageUris ++ cfius)
+    return (dbCard:dbCards, legalities++legalitiesRest, cardFacesAndImageUris ++ cfius)
 
 --This will be ran when a card contains multiple cards on the front
 collectCards conn card_id card_face_id (card@(Card _ _ _ _ _ _ _ _ (Just card_faces) (Just image_uris) legal):cards) = do
@@ -220,16 +224,17 @@ collectCards conn card_id card_face_id (card@(Card _ _ _ _ _ _ _ _ (Just card_fa
     let cardFacesAndImageUris =   addCardIdAndImageUrisToCardFaces card_id card_face_id image_uris card_faces
     --insertRows conn dbCard legalities cardFacesAndImageUris
     (dbCards, legalitiesRest, cfius) <- collectCards conn (card_id + 1) (card_face_id + Prelude.length cardFacesAndImageUris+1) cards
-    return (dbCard:dbCards, legalities:legalitiesRest, cardFacesAndImageUris ++ cfius)
+    return (dbCard:dbCards, legalities++legalitiesRest, cardFacesAndImageUris ++ cfius)
 
 collectCards _ _ _  [] = return ([],[],[])
 
 
 -- Helper functions for collectCards
 
-
-insertIdLegalities :: Legalities -> Int -> Legalities
-insertIdLegalities (Legalities Nothing a b c d e f g h i j k l m n o p q r s t) id = Legalities (Just id) a b c d e f g h i j k l m n o p q r s t
+--God help me i know this is garbage
+insertIdLegalities :: Legalities -> Int -> [DbLegality]
+insertIdLegalities (Legalities Nothing a b c d e f g h i j k l m n o p q r s t) id =
+    [DbLegality id "standard" (a=="legal"), DbLegality id "future" (b=="legal"), DbLegality id "historic" (c=="legal"), DbLegality id "gladiator" (d=="legal"), DbLegality id "pioneer" (e=="legal"), DbLegality id "explorer" (f=="legal"), DbLegality id "modern" (g=="legal"), DbLegality id "legacy" (h=="legal"), DbLegality id "pauper" (i=="legal"), DbLegality id "vintage" (j=="legal"), DbLegality id "penny" (k=="legal"), DbLegality id "commander" (l=="legal"), DbLegality id "brawl" (m=="legal"), DbLegality id "historicBrawl" (n=="legal"), DbLegality id "alchemy" (o=="legal"), DbLegality id "paupercommander" (p=="legal"), DbLegality id "duel" (q=="legal"), DbLegality id "oldschool" (r=="legal"), DbLegality id "premodern" (s=="legal"), DbLegality id "predh" (t=="legal")]
 insertIdLegalities _ _ = error $ "Illegal id insert into data legality"
 
 
@@ -257,10 +262,10 @@ addCardIdToCardFaces _ _ [] = []
 
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-fillDb :: Connection -> ([DbCard], [Legalities], [(CardFace, ImageUris)]) -> IO ()
+fillDb :: Connection -> ([DbCard], [DbLegality], [(CardFace, ImageUris)]) -> IO ()
 fillDb conn (dbCards, legalities, combo) = do
     let (cardFaces, imageUris) = unzip combo
     executeMany conn "INSERT INTO card (id, scryfall_id, lang, name, cmc, oracle_text, type_line, mana_cost ) VALUES (?,?,?,?,?,?,?,?)" dbCards
     executeMany conn "INSERT INTO card_face (id, card_id, name, cmc, oracle_text, type_line, mana_cost) VALUES (?,?,?,?,?,?,?)" cardFaces
     executeMany conn "INSERT INTO image_uris (card_face_id, small , normal , large , png , art_crop, border_crop) VALUES (?,?,?,?,?,?,?)" imageUris
-    executeMany conn "INSERT INTO legalities (card_id, standard  , future  , historic  , gladiator  , pioneer  , explorer  , modern  , legacy  , pauper  , vintage  , penny  , commander  , brawl  , historicbrawl  , alchemy  , paupercommander  , duel  , oldschool  , premodern, predh ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)" legalities
+    executeMany conn "INSERT INTO legalities (card_id, format, is_legal) VALUES (?,?,?)" legalities

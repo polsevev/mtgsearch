@@ -7,9 +7,9 @@ module Algorithm.Operator
 
 
 union :: Eq a => [a] -> [a] -> [a]
-union (a:as) bs | a `elem` bs = union as bs
-union (a:as) bs = a : union as bs
-union [] _ = []
+union (a:as) bs | a `notElem` bs =a : union as bs 
+union (a:as) bs = union as bs
+union [] bs = bs
 
 intersect :: Eq a => [a] -> [a] -> [a]
 intersect (a:as) b = if a `elem` b then a: intersect as b else intersect as b

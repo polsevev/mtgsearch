@@ -87,7 +87,7 @@ data QueryDef =
     CMCLT Int | 
     CMCMT Int | 
     CMCEQ Int |
-    IsLegal String
+    IsLegal String 
     deriving Show
 data Operator = 
     Union |
@@ -105,7 +105,7 @@ seperator ("(":rest) ((start,end):points) = case drop (end-start) rest of
             a -> Left $ ParseError $ "Could not parse input, error happened at: " ++ (show (concat a))
 seperator [name, " ", value, ")"] _ = case extractQueryDef (name, value) of 
     Left a -> Left a
-    Right b -> Right $ Queri $ b
+    Right b -> Right $  b
 seperator a _ = Left (ParseError ("Something went wrong tokenizing the input!\n" ++ (show a)))
 
 spawnBranch :: Operator -> (Either ParseError Token) -> (Either ParseError Token) -> (Either ParseError Token)
@@ -116,19 +116,26 @@ spawnBranch operator (Right res1) (Right res2) = Right (Func operator res1 res2)
 
 
 
-extractQueryDef :: (String, String) -> Either ParseError QueryDef
-extractQueryDef ("SuperType", value) = Right $ SuperType value
-extractQueryDef ("NotSuperType", value) = Right $ NotSuperType value
+extractQueryDef :: (String, String) -> Either ParseError Token
+extractQueryDef ("SuperType", value) = Right $ Queri $ SuperType value
+extractQueryDef ("NotSuperType", value) = Right $ Queri $ NotSuperType value
 extractQueryDef ("CmcLT", value) = case readMaybe value :: Maybe Int of 
-    Just a -> Right $ CMCLT a
+    Just a -> Right $ Queri $ CMCLT a
     Nothing -> Left $ ParseError "Could not parse number from call to CmcLT"
 extractQueryDef ("CmcMT", value) = case readMaybe value :: Maybe Int of 
-    Just a -> Right $ CMCMT a
+    Just a -> Right $ Queri $ CMCMT a
     Nothing -> Left $ ParseError "Could not parse number from call to CmcMT"
 extractQueryDef ("CmcEQ", value) = case readMaybe value :: Maybe Int of 
-    Just a -> Right $ CMCEQ a
+    Just a -> Right $ Queri $ CMCEQ a
     Nothing -> Left $ ParseError "Could not parse number from call to CmcEQ"
-extractQueryDef ("IsLegal", value) = Right $ IsLegal value 
+extractQueryDef ("CmcLTEQ", value) = case readMaybe value :: Maybe Int of
+    Just a -> Right $ Func Union (Queri $ CMCLT a) (Queri $ CMCEQ  a) 
+    Nothing -> Left $ ParseError "Could not parse number from call to CmcLTEQ"
+extractQueryDef ("CmcMTEQ", value) = case readMaybe value :: Maybe Int of
+    Just a -> Right $ Func Union (Queri $ CMCMT a) (Queri $ CMCEQ  a) 
+    Nothing -> Left $ ParseError "Could not parse number from call to CmcLTEQ"
+extractQueryDef ("Color", value) = Right $ Queri $ Color value
+extractQueryDef ("IsLegal", value) = Right $ Queri $ IsLegal value 
 extractQueryDef (a,b) = Left $ ParseError $ "The following command is invalid " ++ show a
 
 extractOperator "union" = Union

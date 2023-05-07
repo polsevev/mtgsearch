@@ -9,7 +9,8 @@ module Algorithm.BaseQuery
     CardFace(..),
     ImageUris(..),
     isLegal,
-    notSuperType
+    notSuperType,
+    color
     ) where
 import qualified Data.Text as T
 import Database.SQLite.Simple
@@ -192,4 +193,5 @@ isLegal qry = do
   cards <- fetchCardsWithIds res
   return $ Holder cards
 
+color :: String -> IO Tree
 

@@ -26,7 +26,7 @@ search q = do
         tree <- executeBottomQuery tokens
         let queryRes = executeQuery tree
         let hyperText = buildHtml queryRes
-        return hyperText
+        return $ "<div style=\"display:flex;flex-wrap:wrap;\">" ++ hyperText ++ "</div>"
   --In order to avoid IO when performing the operators, we fetch all the "bottom" queries first, then perform
   --the operators on them based on the Tree
 
@@ -53,6 +53,7 @@ executeBottomQuery (Queri (CMCLT value)) = cmcLT value
 executeBottomQuery (Queri (CMCMT value)) = cmcMT value
 executeBottomQuery (Queri (CMCEQ value)) = cmcEQ value
 executeBottomQuery (Queri (IsLegal value)) | map toLower value `elem` formats = isLegal $ map toLower value
+executeBottomQuery (Queri (Color value)) = color value
 executeBottomQuery (Queri _) = error $ "Not implemented yet"
 executeBottomQuery (Func operator left right) = do
   left <- executeBottomQuery left
@@ -65,11 +66,11 @@ cardToHtml :: Card -> String
 cardToHtml (Card _ _ _ _ _ _ _ _ [cardFace]) = singleCardFaceHTML cardFace
 
 --Multiface card!
-cardToHtml (Card _ _ _ _ _ _ _ _ cardFaces) = "<div style=\"text-align:center;\"><div style=\"display: inline-flex\">" ++ concatMap singleCardFaceHTML cardFaces ++"</div></div>"
+cardToHtml (Card _ _ _ _ _ _ _ _ cardFaces) = "<div style=\"text-align:center;margin:10px;\"><div style=\"display: inline-flex\">" ++ concatMap singleCardFaceHTML cardFaces ++"</div></div>"
 
 singleCardFaceHTML :: CardFace -> String
 singleCardFaceHTML (CardFace _ _ name _ oracle_text type_line mana_cost (ImageUris _ _ _ image _ _ _ _)) =
-  "<div style=\"text-align:center;\">" ++
+  "<div style=\"text-align:center;margin:10px;\">" ++
     "<h2>" ++ unpack name ++ "</h2>" ++
     "<img src=" ++ unpack image ++ " width=\"200px\"/>"++
     "<p style=\"width:205px;margin: 5 auto;font-size:16;\">" ++  unpack (Data.Maybe.fromMaybe "" type_line) ++ "</p>"++

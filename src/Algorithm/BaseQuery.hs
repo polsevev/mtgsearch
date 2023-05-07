@@ -15,8 +15,9 @@ module Algorithm.BaseQuery
 import qualified Data.Text as T
 import Database.SQLite.Simple
 import Config (getDbPath)
-import Data.Text (Text, isInfixOf)
+import Data.Text (Text, isInfixOf, unpack)
 import Algorithm.Lex (Operator)
+import Data.Maybe
 
 
 {- 
@@ -193,5 +194,29 @@ isLegal qry = do
   cards <- fetchCardsWithIds res
   return $ Holder cards
 
-color :: String -> IO Tree
+-----------------------------------------------------
 
+data CardColor = CardColor
+  Int
+  (Maybe Text)
+  (Maybe Text)
+instance FromRow CardColor where
+  fromRow = CardColor <$> field <*> field <*> field
+color :: String -> IO Tree
+color qry = do
+  dbPath <- getDbPath
+  conn <- open dbPath
+  res <-  runQuerySimple conn "select card.id, card_face.mana_cost, card.mana_cost from card inner join card_face where card.id = card_face.card_id" :: IO [CardColor]
+  let filtered = colorFilter qry res
+  cards <- fetchCardsWithIds filtered
+  return $ Holder cards
+
+colorFilter :: String -> [CardColor] -> [ID]
+colorFilter qry (card@(CardColor id card_mc face_mc):cards) = if all ((== True) . colorMatcher card) qry  then ID id :colorFilter qry cards else colorFilter qry cards
+colorFilter qry [] = []
+
+
+colorMatcher ::CardColor -> Char -> Bool
+colorMatcher  (CardColor id card_mc face_mc) letter= letter `elem` unpack (fromMaybe "" card_mc) || letter `elem` unpack (fromMaybe "" face_mc)
+
+-----------------------------------------------------

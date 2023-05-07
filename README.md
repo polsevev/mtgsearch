@@ -1,14 +1,29 @@
-# mtgsearch
+## How to run the program
 
+In order to run this program one has to install Stack
 
-Developement of a custom magic card search engine. 
+One can download Stack [here](https://docs.haskellstack.org/en/stable/)
 
-# DSL
+Then to verify it works run:
+```
+stack run 
+```
+Before the program can be tested, we have to fill the database with data. There does exist a version to seed the data directly from the Scryfall API, however this takes about 20 minutes (80K object long JSON file that has to be parsed)
+
+Therefore i have provided a smaller JSON file containing less cards. In order to seed the database with this you can use
+```
+stack run -- --seedFromFile
+```
+
+If you want to wait the full 20 minutes you can run the command
+```
+stack run -- --seedFromWeb
+```
+
+## DSL
 
 Will be a language based in set theory, where queries can be combined, negated etc etc. 
-Example.
 
-I had to simplify the DSL a lot in order to have time. I have never written a lexer or parser before. So doing that in a language i am not that familiar with (haskell) proved to be quite difficult. Therefore in this section i will relay exactly how this DSL works. 
 
 It essentially is a Query Language, with similar properties as SQL. (It uses SQL at the `bottom` layer). So we have split the two `Sets` we can to into the following. 
 
@@ -31,12 +46,20 @@ This query will only return Legendary Creatures, (Note: In theory you can write 
     - This function will find all cards with converted mana cost more than the Integer provided as input
 3. (`CmcEQ` Int)
     - This function will find all cards with converted mana cost equal to the Integer
+3. (`CmcLTEQ` Int)
+    - This function will find all cards with converted mana cost less than or equal to the Integer
+3. (`CmcMTEQ` Int)
+    - This function will find all cards with converted mana cost less than or equal to the Integer
 4. (`SuperType` String)
     - This function will find all cards with the String value in its type_field. 
     - NOTE: It is recommended to only use one word at a time and rather use set operators for better matching
-5. (`Color` Char)
-    - This function allows to find all cards of specific color.
+5. (`NotSuperType` String)
+    - This function will find all cards not containing the String value in its typefield
+    - NOTE: It is recommended to only use one word at a time and rather use set operators for better matching
+5. (`Color` String)
+    - This function allows to find all cards containing specific color/colors.
     - VALID INPUT: [W,R,G,B,U] where U = Blue and B = Black
+    - EX: a valid query is (Color WRG) fill find all cards that are White, Red and Black
 
 ## Avalible Operators:
 1. left `intersect` right
@@ -48,7 +71,18 @@ This query will only return Legendary Creatures, (Note: In theory you can write 
 3. left `minus` right
     - This operator will give you all cards present in left but not in right
     - Example: (SuperType Creature) union (SuperType Legendary) = All non Legendary Creatures
-# Lexer
+
+## Example Queries
+
+Here are some example queries and their expected results:
+
+`((SuperType Creature) intersect (SuperType Legendary)) intersect (CmcLTEQ 3)` this query should return all Creatures that are also legendary with a converted mana cost less than or equal to three
+
+`(SuperType Enchantment) intersect (SuperType Creature)` This should return all Enchantments that are also Creatures
+
+`(SuperType Creature) minus (SuperType Legendary)` This should return all non legendary creatures. 
+
+## Lexer
 
 This languages lexer is very dumb. Therefore you the user has to be very verbose with your parenthesis. Example:
 
